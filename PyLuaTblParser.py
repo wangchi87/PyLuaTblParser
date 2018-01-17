@@ -24,7 +24,7 @@ class PyLuaTblParser:
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
         self.luaString = myStr
-        self.parseLuaTbl()
+        #self.parseLuaTbl()
 
     def dump(self):
         return self.luaString
@@ -42,7 +42,7 @@ class PyLuaTblParser:
         for escStr in escapeStrings:
             luaStr = luaStr.replace(escStr, '')
         self.luaString = luaStr
-        self.parseLuaTbl()
+        #self.parseLuaTbl()
 
         # load an external dict, and store in class
 
@@ -194,7 +194,7 @@ class PyLuaTblParser:
         if self.isFloat(stripedStr):
             return float(stripedStr)
 
-        return stripedStr
+        return stripedStr.strip('"')
 
     # split given string with comma at top level
     # e.g. input : '1,2,{3,4}'
@@ -221,7 +221,7 @@ class PyLuaTblParser:
     # when the given string has '=' symbol, turn it into python dict type
     # e.g. input : 'a={1,2}'
     #      output: {'a' : {1,2}}
-    def processDictStr(self, myStr, symbolPos):
+    def processDictStr(self, myStr, symbolPos ):
 
         leftPartStr = myStr[:symbolPos].strip()
         rightPartStr = myStr[symbolPos + 1:].strip()
@@ -270,3 +270,72 @@ class PyLuaTblParser:
                 return self.processDictStr(myStr, symbolPos)
             else:
                 return self.rtnCorrectType(myStr)
+
+        # when the given string has '=' symbol, turn it into python dict type
+        # e.g. input : 'a={1,2}'
+        #      output: {'a' : {1,2}}
+    def newProcessDictStr(self, myStr, symbolPos):
+
+        leftPartStr = myStr[:symbolPos].strip()
+        rightPartStr = myStr[symbolPos + 1:].strip()
+        value = self.newProStr(rightPartStr)
+        #if value != None :
+        return [leftPartStr, value]
+
+
+    def newProStr(self, myStr):
+
+        hasBracelet = (myStr.find('{') != -1)
+
+        if hasBracelet:
+
+            if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
+                # if string starts with '{' and ends with '}'
+                newStr = myStr[1:len(myStr) - 1]
+
+                pairsTuple = self.braceletDict(newStr)
+                partition = self.strPartition(newStr, pairsTuple)
+
+                if newStr.find('=') != -1:
+                    # deal with the string like {1,2,a=1}
+                    # return a dict type
+                    tempDict = {}
+
+                    # turn every one into dict element
+                    index = 1
+
+                    for tmp in partition:
+                        symbolPos = tmp.find('=')
+
+                        if symbolPos == -1 :
+                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
+                                # if this tmp is not a dict element
+                                tmp = self.rtnCorrectType(tmp)
+                                tempDict[index] = tmp
+                                index += 1
+                        else:
+                            # tmp is a dict element
+                            res = self.newProcessDictStr(tmp, symbolPos)
+                            if res[1] != None :
+                                tempDict[res[0]] = res[1]
+
+                    return tempDict
+
+
+                else:
+                    # deal with a list case, like {1, 2, 3}, return a list type data []
+                    tempList = []
+                    for s in partition:
+                        temp = self.processString(s)
+                        if temp != '' and temp != {}:
+                            tempList.append(temp)
+                    return tempList
+
+
+            else:
+                # deal with the string like a = {1,2,3}, return a dict data
+                pass
+
+        else:
+            # deal with single value data, like '1' or 'abc'
+            return self.rtnCorrectType(myStr)

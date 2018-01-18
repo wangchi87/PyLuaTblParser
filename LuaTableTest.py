@@ -9,7 +9,7 @@ if __name__ == '__main__':
     test_str1 = '{array = {65,23,5,a={1,3,4,b=23}},bb = {65,23,5,}}'
     test_str2 = '{array = {65,23,5,},dict = {mixed = {43,54.33,false,9,string = "VALue",},array = {3,6,4,},string = "value",},}'
     test_str3 = '{dict = {mixed = {43,54.33,false,9,string = "value",},array = {3,6,4,},string = "value",},}'
-    test_str4 = '{       \n {12, false, nil}, a = false,}'
+    test_str4 = '{       \n {12, false, nil}, a = false, [1] = 123}'
     test_str5 = '{ a=2,string = nil, s=true}'
     test_str6 = '{dict = {mixed = {43,54.33,false,nil,string = nil,},array = {3,6,4,},string = "value",}}'
 

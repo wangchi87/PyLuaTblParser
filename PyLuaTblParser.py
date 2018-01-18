@@ -90,8 +90,10 @@ class PyLuaTblParser:
     def writeDictData(self, dictData, outputFileHandle):
         # write dict data
         for k, v in dictData.items():
-            if type(k) == str:
+            if type(k) == type(''):
                 outputFileHandle.write(str(k) + '=')
+            if type(k) == type(1):
+                outputFileHandle.write('['+str(k) + ']=')
             self.writeDictKeyData(v, outputFileHandle)
             outputFileHandle.write(',')
 
@@ -123,7 +125,10 @@ class PyLuaTblParser:
             if str(singleValue) == 'False' or str(singleValue) == 'True':
                 outputFileHandle.write(str(singleValue).lower())
             else:
-                outputFileHandle.write(str(singleValue))
+                if type(singleValue) == type(''):
+                    outputFileHandle.write('"' + str(singleValue) + '"')
+                if type(singleValue) == type(1) or type(singleValue) == type(1.1):
+                    outputFileHandle.write(str(singleValue))
         else:
             outputFileHandle.write('nil')
 
@@ -133,8 +138,11 @@ class PyLuaTblParser:
 
         leftPartStr = myStr[:symbolPos]
         rightPartStr = myStr[symbolPos + 1:]
+        leftPartStr = leftPartStr.strip('[')
+        leftPartStr = leftPartStr.strip(']')
+        key = self.processString(leftPartStr)
         value = self.processString(rightPartStr)
-        return (leftPartStr, value)
+        return (key, value)
 
     def processString(self, myStr):
 
@@ -156,7 +164,8 @@ class PyLuaTblParser:
 
                     # turn every one into dict element
                     index = 1
-
+                    # record the all the keys
+                    keyList = []
                     for tmp in partition:
                         symbolPos = tmp.find('=')
 
@@ -166,11 +175,14 @@ class PyLuaTblParser:
                                 # tmp might be like 1 or {1,2,3}
                                 tmp = self.processString(tmp)
                                 tempDict[index] = tmp
+                                keyList.append(index)
                                 index += 1
                         else:
                             # tmp is a dict element
                             key, value = self.processDictStr(tmp, symbolPos)
-                            if value != None :
+                            if value != None and ( key not in keyList):
+                                # make sure the key is not used
+                                # in case the key is used, discard this pair
                                 tempDict[key] = value
                     return tempDict
 

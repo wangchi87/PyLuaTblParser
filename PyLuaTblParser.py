@@ -1,30 +1,22 @@
 class PyLuaTblParser:
     '''
     This is a lua table parser
-    note that
-    1. the 'dict like data' from lua table is stored in dictData and accessible by dumpDict() function
-    2. the 'list like data' from lua table is stored in listData and accessible by dumpList() function
     '''
 
     # string to be parsed
     luaString = ''
-    result = []
-    # the dict data from Lua table
-    dictData = {}
-    # the dict data from Lua table
-    listData = []
+    result = None
 
     def __init__(self):
-        self.result = []
+        self.result = None
         self.luaString = ''
-        self.dictData = {}
-        self.listData = []
+
 
     def load(self, myStr):
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
         self.luaString = myStr
-        #self.parseLuaTbl()
+        self.removeEscapeStr()
 
     def dump(self):
         return self.luaString
@@ -34,89 +26,169 @@ class PyLuaTblParser:
             luaFile = open(filePath)
         except IOError as e:
             print 'file reading error:', e.strerror, e.errno
+            raise Exception('file reading error')
+        self.luaString = luaFile.read()
+        self.removeEscapeStr()
 
-        luaStr = luaFile.read()
+    def removeEscapeStr(self):
         # this is left to be extended if needed
-        escapeStrings = ['\n', '\t']
+        escapeStrings = ['\n', '\t', ' ']
         # delete all the possible escape strings
         for escStr in escapeStrings:
-            luaStr = luaStr.replace(escStr, '')
-        self.luaString = luaStr
-        #self.parseLuaTbl()
+            self.luaString = self.luaString.replace(escStr, '')
 
-        # load an external dict, and store in class
-
+    # load an external dict, and store in class
     def loadDict(self, dict):
-        self.dictData = dict
+        if type(dict) == type({}):
+            newDict = {}
+            typeSet = [type(2), type(2.3), type('a')]
+            for k, v in dict.items():
+                if type(k) in typeSet:
+                    newDict[k] = self.loadDictValue(v)
+            self.result = newDict
+        else:
+            raise Exception('input parameter is not a dict type data')
+
+    def loadDictValue(self, dictValue):
+        if type(dictValue) == type({}):
+            newDict = {}
+            typeSet = [type(2), type(2.3), type('a')]
+            for k, v in dictValue.items():
+                if type(k) in typeSet:
+                    newDict[k] = self.loadDictValue(v)
+            return newDict
+        else:
+            return dictValue
 
     # export dict data
     def dumpDict(self):
-        return self.dictData
-
-    # export dict data
-    def dumpList(self):
-        return self.listData
+        if self.result == None and self.luaString != '':
+            self.result = self.processString(self.luaString)
+        return self.result
 
     # the following three functions export python data in Lua table form
     def dumpLuaTable(self, filePath):
-
         try:
             outputFile = open(filePath, 'w')
             outputFile.write('{')
 
-            # write list data
-            for x in self.listData:
-                outputFile.write(str(x))
-                outputFile.write(',')
+            if type(self.result) == type([]):
+                for s in self.result:
+                    self.writeSingleListData(s, outputFile)
+                    outputFile.write(',')
+            if type(self.result) == type({}):
+                self.writeDictData(self.result, outputFile)
 
-            self.writeDictData(self.dictData, outputFile)
             outputFile.write('}')
             outputFile.close()
-        except:
+        except IOError as e:
+            print e.errno, e.strerror
             raise Exception('errors in exporting data')
 
-    def parseLuaTbl(self):
-        self.result = self.processString(self.luaString)
-        self.seperateDictAndListData()
 
     # write dict data recursively
     def writeDictData(self, dictData, outputFileHandle):
         # write dict data
         for k, v in dictData.items():
-            outputFileHandle.write(str(k) + '=')
+            if type(k) == str:
+                outputFileHandle.write(str(k) + '=')
             self.writeDictKeyData(v, outputFileHandle)
             outputFileHandle.write(',')
 
     # write the key element in dict data
     def writeDictKeyData(self, dictKeyData, outputFileHandle):
-
+        if type(dictKeyData) == type({}):
+            # if dictKeyData is still a dict
+            outputFileHandle.write('{')
+            self.writeDictData(dictKeyData, outputFileHandle)
+            outputFileHandle.write('}')
+            return
         if type(dictKeyData) == type([]):
+            # if dictKeyData is a list
             outputFileHandle.write('{')
             for y in dictKeyData:
                 if type(y) == type({}):
                     self.writeDictData(y, outputFileHandle)
                 else:
-                    if y != None:
-                        outputFileHandle.write(str(y))
-                    else:
-                        outputFileHandle.write('nil')
+                    self.writeSingleListData(y, outputFileHandle)
                     outputFileHandle.write(',')
             outputFileHandle.write('}')
         else:
-            if dictKeyData != None:
-                outputFileHandle.write(str(dictKeyData))
+            # if dictKeyData is a single value
+            self.writeSingleListData(dictKeyData, outputFileHandle)
+
+    # write list data, we need to take care of None, False, and True etc.
+    def writeSingleListData(self, singleValue, outputFileHandle):
+        if singleValue != None:
+            if str(singleValue) == 'False' or str(singleValue) == 'True':
+                outputFileHandle.write(str(singleValue).lower())
             else:
-                outputFileHandle.write('nil')
+                outputFileHandle.write(str(singleValue))
+        else:
+            outputFileHandle.write('nil')
 
-    # as we store the resulting list data and dict data in 'result' list
-    # we have to seperate these two type of data into individual structure
-    def seperateDictAndListData(self):
-        self.listData = [x for x in self.result if type(x) != type({})]
+    # when the given string has '=' symbol, turn it into python dict type
+    # note leftPartStr is the key of the returned key
+    def processDictStr(self, myStr, symbolPos):
 
-        for x in self.result:
-            if type(x) == type({}):
-                for k, v in x.items():
-                    self.dictData[k] = v
+        leftPartStr = myStr[:symbolPos]
+        rightPartStr = myStr[symbolPos + 1:]
+        value = self.processString(rightPartStr)
+        return (leftPartStr, value)
+
+    def processString(self, myStr):
+
+        hasBracelet = (myStr.find('{') != -1)
+
+        if hasBracelet:
+
+            if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
+                # if string starts with '{' and ends with '}'
+                newStr = myStr[1:len(myStr) - 1]
+
+                pairsTuple = self.braceletDict(newStr)
+                partition = self.strPartition(newStr, pairsTuple)
+
+                if newStr.find('=') != -1:
+                    # deal with the string like {1,{1,2,3},a=1}
+                    # return a dict type
+                    tempDict = {}
+
+                    # turn every one into dict element
+                    index = 1
+
+                    for tmp in partition:
+                        symbolPos = tmp.find('=')
+
+                        if symbolPos == -1 :
+                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
+                                # if this tmp is not a dict element
+                                # tmp might be like 1 or {1,2,3}
+                                tmp = self.processString(tmp)
+                                tempDict[index] = tmp
+                                index += 1
+                        else:
+                            # tmp is a dict element
+                            key, value = self.processDictStr(tmp, symbolPos)
+                            if value != None :
+                                tempDict[key] = value
+                    return tempDict
+
+                else:
+                    # deal with a list case, like {1, 2, 3}, return a list type data []
+                    tempList = []
+                    for s in partition:
+                        temp = self.processString(s)
+                        if temp != '' and temp != {}:
+                            tempList.append(temp)
+                    return tempList
+
+            else:
+                # deal with the string like a = {1,2,3}, return a dict data
+                pass
+        else:
+            # deal with single value data, like '1' or 'abc'
+            return self.rtnCorrectType(myStr)
 
     # find the indexs of all the charLetter in myStr
     def rtnCharLoc(self, myStr, charLetter):
@@ -177,24 +249,23 @@ class PyLuaTblParser:
     # tell whether the string is a number(float or int?) or a Boolean value, or a string
     # return their corresponding types
     def rtnCorrectType(self, myStr):
-        stripedStr = myStr.strip().lower()
 
         # is Boolean type ?
-        if stripedStr == 'false':
+        if myStr.lower() == 'false':
             return False
-        if stripedStr == 'true':
+        if myStr.lower() == 'true':
             return True
 
-        if stripedStr == 'nil':
+        if myStr == 'nil':
             return None
 
         # is a int number ?
-        if stripedStr.isdigit():
-            return int(stripedStr)
-        if self.isFloat(stripedStr):
-            return float(stripedStr)
+        if myStr.isdigit():
+            return int(myStr)
+        if self.isFloat(myStr):
+            return float(myStr)
 
-        return stripedStr.strip('"')
+        return myStr.strip('"')
 
     # split given string with comma at top level
     # e.g. input : '1,2,{3,4}'
@@ -217,125 +288,3 @@ class PyLuaTblParser:
         if strStart != end:
             partition.append(myStr[strStart:])
         return partition
-
-    # when the given string has '=' symbol, turn it into python dict type
-    # e.g. input : 'a={1,2}'
-    #      output: {'a' : {1,2}}
-    def processDictStr(self, myStr, symbolPos ):
-
-        leftPartStr = myStr[:symbolPos].strip()
-        rightPartStr = myStr[symbolPos + 1:].strip()
-        myDict = {}
-        value = self.processString(rightPartStr)
-        if value != None:
-            myDict[leftPartStr] = value
-        return myDict
-
-    # core function of string processing
-    def processString(self, myStr):
-
-        res = []
-        hasBracelet = (myStr.find('{') != -1)
-
-        if hasBracelet:
-            # if string starts with '{' and ends with '}'
-            if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
-                newStr = myStr[1:len(myStr) - 1]
-                pairsTuple = self.braceletDict(newStr)
-                partition = self.strPartition(newStr, pairsTuple)
-                for s in partition:
-                    temp = self.processString(s)
-                    if temp != '' and temp != {}:
-                        res.append(temp)
-                return res
-            else:
-                # if string does not start with '{' and end with '}'
-                # in this case, we will probably deal with a dict element
-
-                symbolPos = myStr.find('=')
-                # if we find a '=', it means we are dealing with a dict element
-                if symbolPos != -1:
-                    return self.processDictStr(myStr, symbolPos)
-                else:
-                    raise Exception('Incorrect input Lua Table')
-        else:
-            # return the strings which fall into here
-            # there are only two types of strings which might end up here
-            # 1. single strings, like 'abcdefg', or '123'
-            # 2. dict type strings without '{}', like 'abc={123}'
-
-            symbolPos = myStr.find('=')
-            # if we find a '=', it means we are dealing with a dict element
-            if symbolPos != -1:
-                return self.processDictStr(myStr, symbolPos)
-            else:
-                return self.rtnCorrectType(myStr)
-
-        # when the given string has '=' symbol, turn it into python dict type
-        # e.g. input : 'a={1,2}'
-        #      output: {'a' : {1,2}}
-    def newProcessDictStr(self, myStr, symbolPos):
-
-        leftPartStr = myStr[:symbolPos].strip()
-        rightPartStr = myStr[symbolPos + 1:].strip()
-        value = self.newProStr(rightPartStr)
-        #if value != None :
-        return [leftPartStr, value]
-
-
-    def newProStr(self, myStr):
-
-        hasBracelet = (myStr.find('{') != -1)
-
-        if hasBracelet:
-
-            if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
-                # if string starts with '{' and ends with '}'
-                newStr = myStr[1:len(myStr) - 1]
-
-                pairsTuple = self.braceletDict(newStr)
-                partition = self.strPartition(newStr, pairsTuple)
-
-                if newStr.find('=') != -1:
-                    # deal with the string like {1,2,a=1}
-                    # return a dict type
-                    tempDict = {}
-
-                    # turn every one into dict element
-                    index = 1
-
-                    for tmp in partition:
-                        symbolPos = tmp.find('=')
-
-                        if symbolPos == -1 :
-                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
-                                # if this tmp is not a dict element
-                                tmp = self.rtnCorrectType(tmp)
-                                tempDict[index] = tmp
-                                index += 1
-                        else:
-                            # tmp is a dict element
-                            res = self.newProcessDictStr(tmp, symbolPos)
-                            if res[1] != None :
-                                tempDict[res[0]] = res[1]
-
-                    return tempDict
-
-
-                else:
-                    # deal with a list case, like {1, 2, 3}, return a list type data []
-                    tempList = []
-                    for s in partition:
-                        temp = self.processString(s)
-                        if temp != '' and temp != {}:
-                            tempList.append(temp)
-                    return tempList
-
-
-            else:
-                # deal with the string like a = {1,2,3}, return a dict data
-                pass
-
-        else:
-            # deal with single value data, like '1' or 'abc'
-            return self.rtnCorrectType(myStr)

@@ -11,12 +11,12 @@ class PyLuaTblParser:
         self.result = None
         self.luaString = ''
 
-
     def load(self, myStr):
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
         self.luaString = myStr
         self.removeEscapeStr()
+        self.checkLuaTbl()
 
     def dump(self):
         return self.luaString
@@ -29,10 +29,23 @@ class PyLuaTblParser:
             raise Exception('file reading error')
         self.luaString = luaFile.read()
         self.removeEscapeStr()
+        self.checkLuaTbl()
+
+    def checkLuaTbl(self):
+        # make sure lua table starts and ends with { }
+        if (self.luaString.find('{') != 0) or (self.luaString.rfind('}') != len(self.luaString) - 1):
+            raise Exception('Incorrect input Lua Table: table string does not start and end with { and }.')
+
+        # checck if bracelet number matches
+        lList = self.rtnCharLoc(self.luaString, '{')
+        rList = self.rtnCharLoc(self.luaString, '}')
+
+        if len(lList) != len(rList):
+            raise Exception('Incorrect input Lua Table: bracelet number does not match')
 
     def removeEscapeStr(self):
         # this is left to be extended if needed
-        escapeStrings = ['\n', '\t', ' ']
+        escapeStrings = ['\n', '\t', ' ', '\r', '\v', '\f', '\'', '\a', '\b']
         # delete all the possible escape strings
         for escStr in escapeStrings:
             self.luaString = self.luaString.replace(escStr, '')
@@ -144,6 +157,7 @@ class PyLuaTblParser:
         value = self.processString(rightPartStr)
         return (key, value)
 
+    # core function of lua table string parser
     def processString(self, myStr):
 
         hasBracelet = (myStr.find('{') != -1)
@@ -169,7 +183,7 @@ class PyLuaTblParser:
                     for tmp in partition:
                         symbolPos = tmp.find('=')
 
-                        if symbolPos == -1 :
+                        if symbolPos == -1:
                             if len(tmp) != 0 and tmp.strip().lower() != 'nil':
                                 # if this tmp is not a dict element
                                 # tmp might be like 1 or {1,2,3}
@@ -180,7 +194,7 @@ class PyLuaTblParser:
                         else:
                             # tmp is a dict element
                             key, value = self.processDictStr(tmp, symbolPos)
-                            if value != None and ( key not in keyList):
+                            if value != None and (key not in keyList):
                                 # make sure the key is not used
                                 # in case the key is used, discard this pair
                                 tempDict[key] = value
@@ -196,13 +210,13 @@ class PyLuaTblParser:
                     return tempList
 
             else:
-                # deal with the string like a = {1,2,3}, return a dict data
-                pass
+                # deal with the string like a{1,2,3}, return a dict data
+                return self.rtnCorrectType(myStr)
         else:
             # deal with single value data, like '1' or 'abc'
             return self.rtnCorrectType(myStr)
 
-    # find the indexs of all the charLetter in myStr
+    # find the indices of all the charLetter in myStr
     def rtnCharLoc(self, myStr, charLetter):
         locations = []
         index = myStr.find(charLetter)
@@ -219,8 +233,8 @@ class PyLuaTblParser:
         lList = self.rtnCharLoc(myStr, '{')
         rList = self.rtnCharLoc(myStr, '}')
 
-        if len(lList) != len(rList):
-            raise Exception('Incorrect input Lua Table')
+        #if len(lList) != len(rList):
+        #    raise Exception('Incorrect input Lua Table')
 
         # we use a stack to find corresponding bracelet
         stack = []
@@ -287,7 +301,7 @@ class PyLuaTblParser:
         commaStart = 0
         strStart = 0
         partition = []
-        end = myStr.find(',', commaStart)
+        end = self.findLuaTblSep(myStr, commaStart)
 
         while end != -1:
             if not self.isIndexInBracelet(end, braceletPair):
@@ -295,8 +309,17 @@ class PyLuaTblParser:
                 strStart = end + 1
 
             commaStart = end + 1
-            end = myStr.find(',', commaStart)
+            end = self.findLuaTblSep(myStr, commaStart)
 
         if strStart != end:
             partition.append(myStr[strStart:])
         return partition
+
+    # find separation index of given string with first ',' or ';'
+    def findLuaTblSep(self, myStr, index):
+        end1 = myStr.find(',', index)
+        end2 = myStr.find(';', index)
+        if end2 == -1 or end2 > end1:
+            return end1
+        else:
+            return end2

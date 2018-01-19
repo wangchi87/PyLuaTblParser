@@ -397,6 +397,7 @@ class TestPyLuaTblParser(unittest.TestCase):
         dumped_dict = lua_table_parser.dumpDict()
 
         nested = dumped_dict['nested']
+        print nested
         self.assertTrue(type(nested) == list)
         self.assertEqual(nested[0], 80)
         self.assertEqual(nested[1], 89.5)

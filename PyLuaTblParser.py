@@ -19,7 +19,7 @@ class PyLuaTblParser:
     def load(self, myStr):
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
-        self.luaString = myStr
+        self.luaString = self.removeComment(myStr)
         self.removeEscapeStr()
         self.checkLuaTbl()
 
@@ -32,7 +32,8 @@ class PyLuaTblParser:
         except IOError as e:
             print 'file reading error:', e.strerror, e.errno
             raise Exception('file reading error')
-        self.luaString = luaFile.read()
+        fileStr = luaFile.read()
+        self.luaString = self.removeComment(fileStr)
         self.removeEscapeStr()
         self.checkLuaTbl()
 
@@ -302,19 +303,19 @@ class PyLuaTblParser:
         '''
 
         # is Boolean type ?
-        if myStr.lower() == 'false':
+        if myStr.strip().lower() == 'false':
             return False
-        if myStr.lower() == 'true':
+        if myStr.strip().lower() == 'true':
             return True
 
-        if myStr == 'nil':
+        if myStr.strip() == 'nil':
             return None
 
         # is a int number ?
-        if myStr.isdigit():
-            return int(myStr)
-        if self.isFloat(myStr):
-            return float(myStr)
+        if myStr.strip().isdigit():
+            return int(myStr.strip())
+        if self.isFloat(myStr.strip()):
+            return float(myStr.strip())
 
         value = myStr
 
@@ -338,8 +339,8 @@ class PyLuaTblParser:
         return value.strip().strip('"')
 
     # split given string with comma at top level
-    # e.g. input : '1,2,{3,4}'
-    #      output: {'1','2','{3,4}'}
+    # e.g. input : {'1','2','{3,4}'}
+    #      output: '1,2,{3,4}'R
     def strPartition(self, myStr, bracketPair):
 
         commaStart = 0
@@ -362,12 +363,15 @@ class PyLuaTblParser:
 
     # find separation index of given string with first ',' or ';'
     def findLuaTblSep(self, myStr, index):
-        end1 = myStr.find(',', index)
-        end2 = myStr.find(';', index)
-        if end2 == -1 or end2 > end1:
-            return end1
+        sep = [',',';']
+        pos = []
+        for s in sep:
+            pos.append(myStr.find(s,index))
+        pos = [x for x in sorted(pos) if x > -1]
+        if len(pos) == 0:
+            return -1
         else:
-            return end2
+            return pos[0]
 
     def strPreProcessing(self, myStr = 'ds\\ta=ssd da= {dsadwa}'):
         '''
@@ -389,7 +393,7 @@ class PyLuaTblParser:
 
         return myStr
 
-    def removeComment(self, myStr='abc--{bhgy--ijk}1234--nbkyg8t87tgh\nxyz'):
+    def removeComment(self, myStr):
 
         # 删除单行注释
         commentStart = myStr.find('--')

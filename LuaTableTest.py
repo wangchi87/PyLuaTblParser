@@ -1,4 +1,4 @@
-
+# -*- coding:utf-8 -*-
 
 from PyLuaTblParser import *
 
@@ -85,15 +85,15 @@ root = {
 
 }}
 '''
-    test_str9 = '{root = {"Test Pattern String",123}}'
+    test_str9 = '{80, 90;    100}'
 
     test_str = [test_str0, test_str1, test_str2, test_str3, test_str4, test_str5, test_str6]
 
-    test_str = ['{ "r\\t     \\n", \"a={12, false; nil}\" }']
-    # #['{["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"] = 1}']
+    test_str = [test_str9]
 
 
-'''
+
+
     for s in test_str:
         a1 = PyLuaTblParser()
         a2 = PyLuaTblParser()
@@ -102,6 +102,8 @@ root = {
         a1.load(s)
 
         d1 = a1.dumpDict()
+
+
         print 'Lua Table:\t', s
         print 'a1 dict:  \t', a1.dumpDict()
 
@@ -115,25 +117,12 @@ root = {
 
         print 'a3 dict: \t', d3
         print '\n'
-'''
+
 
 test = 'sad--[luatext = "{\"object with 1 {{{&&%^%%%@%%@#}}member\" = {\"array with 1 element\"}}1234--sda\nxyz'
 b = PyLuaTblParser()
 #print b.removeComment(test)
 
-t2 = '''			4 , 5        ,          6           ,7        },
-		--[[[][][]  Test multi-line comments
-			compact = {1,2,3,4,5,6,7},
-	- -[luatext = "{\"object with 1 member\" = {\"array with 1 element\"}}",
-		quotes = "&#34; (0x0022) %22 0x22 034 &#x22;",
-		["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"]
-		= "A key can be any string"]]
-	--         ]]
-		compact = {1,2,3,4,5,6,7213414},
-		luatext = "{\"object with 1 member\" = {\"array with 1 element\"}}",
-		quotes = "&#34; (0x0022) %22 0x22 034 &#x22;",
-		["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"]
-		= "A key can be any string"'''
 
 commentTest = '''abc--[[[][][]  Test multi-line comments
 			compact = {1,2,3,4,5,6,7},
@@ -142,7 +131,7 @@ commentTest = '''abc--[[[][][]  Test multi-line comments
 		["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"]
 		= "A key can be any string"]]
 	--         ]]def'''
-print b.removeComment(commentTest)
+
 
 #print b.removeExtraEscapeString(''' \n\t["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"] ''')
 

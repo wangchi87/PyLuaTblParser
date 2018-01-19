@@ -391,40 +391,64 @@ class PyLuaTblParser:
 
     def removeComment(self, myStr='abc--{bhgy--ijk}1234--nbkyg8t87tgh\nxyz'):
 
-        # find the first comment symbol
-        commentSymbol = ['--', '- -']
-        posList = []
-        for sym in commentSymbol:
-            posList.append(myStr.find(sym))
-        posList = [ x for x in sorted(posList) if x >= 0]
-
-        commentStart = -1
-        if len(posList) > 0:
-            commentStart = posList[0]
+        # 删除单行注释
+        commentStart = myStr.find('--')
 
         # comment processing
         if commentStart != -1:
-            bracketPair = self.bracketDict(myStr)
-            if len(bracketPair) > 0 :
-                leftBracket = bracketPair[0][0]
-                rightBracket = bracketPair[0][1]
-                if rightBracket > leftBracket:
-                    # 用 {} 标识注释的位置
-                    myStr = myStr[0:commentStart] + myStr[rightBracket+1:]
+            if self.isMultiLineComment(myStr, commentStart):
+                endPos = self.locateMultiLineComment(myStr, commentStart)
             else:
                 # 否则用 \n 标识注释的结束位置
                 endPos = myStr.find('\n', commentStart + 1)
-                myStr = myStr[0:commentStart] + myStr[endPos+1:]
 
+            myStr = myStr[0:commentStart] + myStr[endPos + 1:]
             myStr = self.removeComment(myStr)
         return myStr
+
+    def isMultiLineComment(self,myStr, commentStart):
+
+        newStr = myStr[commentStart+2:].strip()
+
+        if newStr.find('[[') == 0:
+            return True
+        return False
+
+
+    def locateMultiLineComment(self,myStr, commentStart):
+        # myStr might be '--   [[ dsa221rfcsdsadd[[]]   -- ]]abcd'
+        # 删除 '--'
+
+        if myStr.find('[[') != -1:
+            end = myStr.find(']]')
+            while end !=-1:
+                tmp = myStr[:end].strip()
+                if tmp.rfind('--') == len(tmp) - 2 :
+                    break
+                else:
+                    end = myStr.find(']]', end + 1)
+            if end == -1:
+                raise Exception('invalide lua multi line comment')
+
+        return end+2
+        pass
+
+
 
     def removeExtraEscapeString(self, myStr = ' \n\t"r\\t     \\n" '):
 
         # 检查myStr中是否包含 " " 子串
         # 子串中的空格不可去除
         start = myStr.find('"')
-        end = myStr.find('"', start+1)
+
+        ignore = myStr.find('\"', start+1)
+
+        while ignore!= -1:
+            end = ignore
+            ignore = myStr.find('\"', ignore + 1)
+
+
+        end = myStr.find('"', end+1)
 
         if start == -1 and end == -1:
             return myStr.strip()
@@ -437,9 +461,13 @@ class PyLuaTblParser:
                 else:
                     if myStr[s] not in escapeStrings:
                         # " " 外的非转义字符怎么办？
-                        pass
+                        newStr = newStr + myStr[s]
 
             return newStr
 
-    def isDictStr(self, myStr='*Sdsa=132easd={231rfs3=P{}}'):
+    def isDictStr(self, myStr='*Sdsa={13}2easd={231rfs3=P{}}'):
+        '''
+        test if the given str represents a dict data
+        '''
+
         pass

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+
+class InvalidLuaTableError(Exception):
+    pass
+
 class PyLuaTblParser:
     '''
     This is a lua table parser
@@ -34,21 +39,22 @@ class PyLuaTblParser:
     def checkLuaTbl(self):
         # make sure lua table starts and ends with { }
         if (self.luaString.find('{') != 0) or (self.luaString.rfind('}') != len(self.luaString) - 1):
-            raise Exception('Incorrect input Lua Table: table string does not start and end with { and }.')
+            raise InvalidLuaTableError('Incorrect input Lua Table: table string does not start and end with { and }.')
 
-        # checck if bracelet number matches
+        # checck if bracket number matches
         lList = self.rtnCharLoc(self.luaString, '{')
         rList = self.rtnCharLoc(self.luaString, '}')
 
         if len(lList) != len(rList):
-            raise Exception('Incorrect input Lua Table: bracelet number does not match')
+            raise InvalidLuaTableError('Incorrect input Lua Table: bracket number does not match')
 
     def removeEscapeStr(self):
+        pass
         # this is left to be extended if needed
-        escapeStrings = ['\n', '\t', ' ', '\r', '\v', '\f', '\'', '\a', '\b']
+        #escapeStrings = ['\n', '\t', '\r', '\v', '\f', '\'', '\a', '\b']
         # delete all the possible escape strings
-        for escStr in escapeStrings:
-            self.luaString = self.luaString.replace(escStr, '')
+        #for escStr in escapeStrings:
+            #self.luaString = self.luaString.replace(escStr, '')
 
     # load an external dict, and store in class
     def loadDict(self, dict):
@@ -104,7 +110,7 @@ class PyLuaTblParser:
         # write dict data
         for k, v in dictData.items():
             if type(k) == type(''):
-                outputFileHandle.write(str(k) + '=')
+                outputFileHandle.write('"'+str(k) + '"=')
             if type(k) == type(1):
                 outputFileHandle.write('['+str(k) + ']=')
             self.writeDictKeyData(v, outputFileHandle)
@@ -149,26 +155,27 @@ class PyLuaTblParser:
     # note leftPartStr is the key of the returned key
     def processDictStr(self, myStr, symbolPos):
 
-        leftPartStr = myStr[:symbolPos]
-        rightPartStr = myStr[symbolPos + 1:]
+        leftPartStr = myStr[:symbolPos].strip()
+        rightPartStr = myStr[symbolPos + 1:].strip()
         leftPartStr = leftPartStr.strip('[')
         leftPartStr = leftPartStr.strip(']')
-        key = self.processString(leftPartStr)
+        key = self.rtnCorrectType(leftPartStr)
         value = self.processString(rightPartStr)
         return (key, value)
 
     # core function of lua table string parser
+    # add a lable of the string here!!!
     def processString(self, myStr):
 
-        hasBracelet = (myStr.find('{') != -1)
+        hasBracket = (myStr.find('{') != -1)
 
-        if hasBracelet:
+        if hasBracket:
 
             if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
                 # if string starts with '{' and ends with '}'
                 newStr = myStr[1:len(myStr) - 1]
 
-                pairsTuple = self.braceletDict(newStr)
+                pairsTuple = self.bracketDict(newStr)
                 partition = self.strPartition(newStr, pairsTuple)
 
                 if newStr.find('=') != -1:
@@ -216,8 +223,15 @@ class PyLuaTblParser:
             # deal with single value data, like '1' or 'abc'
             return self.rtnCorrectType(myStr)
 
-    # find the indices of all the charLetter in myStr
     def rtnCharLoc(self, myStr, charLetter):
+        '''
+        return the indices of all the charLetter in myStr
+        e.g. input : {1,2,{3,4}}, and charLetter is '}'
+              output: [9,10]
+        :param    myStr:      input string
+        :param    charLetter: char letter to fined
+        :return:  the indices of all the charLetter in myStr
+        '''
         locations = []
         index = myStr.find(charLetter)
         while index > -1:
@@ -225,47 +239,54 @@ class PyLuaTblParser:
             index = myStr.find(charLetter, index + 1)
         return locations
 
-    # find corresponding bracelet pairs in given string
-    # e.g. input : {1,2,{3,4}}
-    #      output: [(0,10),(5,9)]
-    def braceletDict(self, myStr):
 
-        lList = self.rtnCharLoc(myStr, '{')
-        rList = self.rtnCharLoc(myStr, '}')
+    def bracketDict(self, myStr):
+        '''
+        find corresponding bracket pairs in given string
+        e.g.    input : '{1,2,{3,4}}'
+                output: [(0,10),(5,9)]
+        :param myStr:   input string
+        :return:        corresponding bracket pairs in given string
+        '''
+        try:
+            lList = self.rtnCharLoc(myStr, '{')
+            rList = self.rtnCharLoc(myStr, '}')
 
-        #if len(lList) != len(rList):
-        #    raise Exception('Incorrect input Lua Table')
+            # if len(lList) != len(rList):
+            #    raise Exception('Incorrect input Lua Table')
 
-        # we use a stack to find corresponding bracelet
-        stack = []
-        ref = {}
-        popIndex = 0
+            # we use a stack to find corresponding bracket
+            stack = []
+            ref = {}
+            popIndex = 0
 
-        while len(stack) > 0 or len(lList) > 0:
-            if len(lList) > 0:
-                if lList[popIndex] < rList[popIndex]:
-                    stack.append(lList.pop(popIndex))
+            while len(stack) > 0 or len(lList) > 0:
+                if len(lList) > 0:
+                    if lList[popIndex] < rList[popIndex]:
+                        stack.append(lList.pop(popIndex))
+                    else:
+                        lpos = stack.pop(len(stack) - 1)
+                        rpos = rList.pop(popIndex)
+                        ref[lpos] = rpos
                 else:
                     lpos = stack.pop(len(stack) - 1)
                     rpos = rList.pop(popIndex)
                     ref[lpos] = rpos
-            else:
-                lpos = stack.pop(len(stack) - 1)
-                rpos = rList.pop(popIndex)
-                ref[lpos] = rpos
 
-        return [(k, ref[k]) for k in sorted(ref.keys())]
+            return [(k, ref[k]) for k in sorted(ref.keys())]
+        except:
+            raise Exception("invalid bracket pair in string")
 
-    # judge whether the index is inside of the range of index of each bracelet or not
-    # e.g. if index is 2, the braceletPair is (3,4) (5,10) then the index is not inside(return False)
-    def isIndexInBracelet(self, index, braceletPair):
-        for i in range(0, len(braceletPair)):
-            if index in range(braceletPair[i][0], braceletPair[i][1]):
+    # judge whether the index is inside of the range of index of each bracket or not
+    # e.g. if index is 2, the bracketPair is (3,4) (5,10) then the index is not inside(return False)
+    def isIndexInBracket(self, index, bracketPair):
+        for i in range(0, len(bracketPair)):
+            if index in range(bracketPair[i][0], bracketPair[i][1]):
                 return True
         return False
 
-    # test if a string represent a float number
     def isFloat(self, myStr):
+        ''' test if a string represent a float number '''
         try:
             float(myStr)
             return True
@@ -275,6 +296,10 @@ class PyLuaTblParser:
     # tell whether the string is a number(float or int?) or a Boolean value, or a string
     # return their corresponding types
     def rtnCorrectType(self, myStr):
+        '''
+        tell whether the string is a number(float or int?) or a Boolean value, or a string
+        return the value of their corresponding types
+        '''
 
         # is Boolean type ?
         if myStr.lower() == 'false':
@@ -291,12 +316,31 @@ class PyLuaTblParser:
         if self.isFloat(myStr):
             return float(myStr)
 
-        return myStr.strip('"')
+        value = myStr
+
+        # process escape string
+        value = value.replace('abc', 'cba')
+
+        value = value.replace('\\"', '\"')
+        value = value.replace("\\'", '\'')
+        value = value.replace('\\a', '\a')
+        value = value.replace('\\b', '\b')
+        value = value.replace('\\x08', '\b')
+        value = value.replace('\\x0c', '\f')
+        value = value.replace('\\n', '\n')
+        value = value.replace('\\r', '\r')
+        value = value.replace('\\t', '\t')
+        value = value.replace('\\f', '\f')
+        value = value.replace('\\\\', '\\')
+        value = value.replace('\\/', '/')
+        value = value.replace('\\v', '\v')
+
+        return value.strip().strip('"')
 
     # split given string with comma at top level
     # e.g. input : '1,2,{3,4}'
     #      output: {'1','2','{3,4}'}
-    def strPartition(self, myStr, braceletPair):
+    def strPartition(self, myStr, bracketPair):
 
         commaStart = 0
         strStart = 0
@@ -304,7 +348,7 @@ class PyLuaTblParser:
         end = self.findLuaTblSep(myStr, commaStart)
 
         while end != -1:
-            if not self.isIndexInBracelet(end, braceletPair):
+            if not self.isIndexInBracket(end, bracketPair):
                 partition.append(myStr[strStart:end])
                 strStart = end + 1
 
@@ -315,6 +359,7 @@ class PyLuaTblParser:
             partition.append(myStr[strStart:])
         return partition
 
+
     # find separation index of given string with first ',' or ';'
     def findLuaTblSep(self, myStr, index):
         end1 = myStr.find(',', index)
@@ -323,3 +368,78 @@ class PyLuaTblParser:
             return end1
         else:
             return end2
+
+    def strPreProcessing(self, myStr = 'ds\\ta=ssd da= {dsadwa}'):
+        '''
+        1. 删除注释
+            '--{}'，以及'-- \n'类型
+        2. 删除多余的转义字符
+            多余：'\n "dsad\\t " \t\n ', 在 " " 之外字符
+            这里不处理""内部的转义字符
+        3. 判断字符是否代表一个dict数据，并返回划分位置
+        :param mystr:
+        :return:
+        '''
+        pass
+
+        myStr = self.removeComment(myStr)
+        myStr = self.removeExtraEscapeString(myStr)
+
+
+
+        return myStr
+
+    def removeComment(self, myStr='abc--{bhgy--ijk}1234--nbkyg8t87tgh\nxyz'):
+
+        # find the first comment symbol
+        commentSymbol = ['--', '- -']
+        posList = []
+        for sym in commentSymbol:
+            posList.append(myStr.find(sym))
+        posList = [ x for x in sorted(posList) if x >= 0]
+
+        commentStart = -1
+        if len(posList) > 0:
+            commentStart = posList[0]
+
+        # comment processing
+        if commentStart != -1:
+            bracketPair = self.bracketDict(myStr)
+            if len(bracketPair) > 0 :
+                leftBracket = bracketPair[0][0]
+                rightBracket = bracketPair[0][1]
+                if rightBracket > leftBracket:
+                    # 用 {} 标识注释的位置
+                    myStr = myStr[0:commentStart] + myStr[rightBracket+1:]
+            else:
+                # 否则用 \n 标识注释的结束位置
+                endPos = myStr.find('\n', commentStart + 1)
+                myStr = myStr[0:commentStart] + myStr[endPos+1:]
+
+            myStr = self.removeComment(myStr)
+        return myStr
+
+    def removeExtraEscapeString(self, myStr = ' \n\t"r\\t     \\n" '):
+
+        # 检查myStr中是否包含 " " 子串
+        # 子串中的空格不可去除
+        start = myStr.find('"')
+        end = myStr.find('"', start+1)
+
+        if start == -1 and end == -1:
+            return myStr.strip()
+        else:
+            escapeStrings = ['\n', '\t', ' ']
+            newStr = ''
+            for s in range(0, len(myStr)):
+                if s in range(start, end+1):
+                    newStr = newStr + myStr[s]
+                else:
+                    if myStr[s] not in escapeStrings:
+                        # " " 外的非转义字符怎么办？
+                        pass
+
+            return newStr
+
+    def isDictStr(self, myStr='*Sdsa=132easd={231rfs3=P{}}'):
+        pass

@@ -12,7 +12,7 @@ class PyLuaTblParser:
     luaString = ''
     result = None
 
-    otherCharacterSet="~!@#$%^&*?"
+    otherCharacterSet="~!@#$%^&*()_+-={':[,]}|;.</>?"
 
     def __init__(self):
         self.result = None
@@ -21,7 +21,7 @@ class PyLuaTblParser:
     def load(self, myStr):
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
-        self.luaString = self.__removeComment(myStr)
+        self.luaString = self.__removeComment(myStr).strip()
         self.checkLuaTbl()
         self.result = self.processString(self.luaString)
 
@@ -35,7 +35,7 @@ class PyLuaTblParser:
             print 'file reading error:', e.strerror, e.errno
             raise Exception('file reading error')
         fileStr = luaFile.read()
-        self.luaString = self.__removeComment(fileStr)
+        self.luaString = self.__removeComment(fileStr).strip()
         self.checkLuaTbl()
         self.result = self.processString(self.luaString)
 
@@ -43,14 +43,14 @@ class PyLuaTblParser:
         # make sure lua table starts and ends with { }
         if (self.luaString.find('{') != 0) or (self.luaString.rfind('}') != len(self.luaString) - 1):
             raise InvalidLuaTableError('Incorrect input Lua Table: table string does not start and end with { and }.')
-
+        '''
         # checck if bracket number matches
         lList = self.rtnCharLoc(self.luaString, '{')
         rList = self.rtnCharLoc(self.luaString, '}')
 
         if len(lList) != len(rList):
             raise InvalidLuaTableError('Incorrect input Lua Table: bracket number does not match')
-
+        '''
 
     # load an external dict, and store in class
     def loadDict(self, dict):
@@ -175,88 +175,88 @@ class PyLuaTblParser:
     # core function of lua table string parser
     # add a lable of the string here!!!
     def processString(self, myStr):
-
+        # {},{},{}
         myStr = myStr.strip()
 
-        hasBracket = (myStr.find('{') != -1)
+        hasBracket = (myStr.find('{') == 0 and myStr.rfind('}') == len(myStr) - 1)
 
         if hasBracket:
 
-            if (myStr.find('{') == 0) and (myStr.rfind('}') == len(myStr) - 1):
-                # if string starts with '{' and ends with '}'
-                newStr = myStr[1:len(myStr) - 1]
+            # if string starts with '{' and ends with '}'
+            newStr = myStr[1:len(myStr) - 1].strip()
 
-                pairsTuple = self.bracketDict(newStr)
-                partition = self.strPartition(newStr, pairsTuple)
+            if (newStr.find('{') == 0 and newStr.rfind('}') == len(newStr) - 1):
+                tmp = []
+                tmp.append(self.processString(newStr))
+                return tmp
 
+            pairsTuple = self.bracketDict(newStr)
+            partition = self.strPartition(newStr, pairsTuple)
 
-                dictStrList = []
-                hasDictInTable = False
-                for s in partition:
-                    dictStr = self.parseDictStr(s)
-                    dictStrList.append(dictStr)
-                    if type(dictStr) != str:
-                        hasDictInTable = True
+            dictStrList = []
+            hasDictInTable = False
+            for s in partition:
+                dictStr = self.parseDictStr(s)
+                dictStrList.append(dictStr)
+                if type(dictStr) != str:
+                    hasDictInTable = True
 
-                if hasDictInTable:
-                    # deal with the string like {1,{1,2,3},a=1}
-                    # return a dict type
-                    tempDict = {}
+            if hasDictInTable:
+                # deal with the string like {1,{1,2,3},a=1}
+                # return a dict type
+                tempDict = {}
 
-                    # turn every one into dict element
-                    index = 1
-                    # record the all the keys
-                    keyList = []
+                # turn every one into dict element
+                index = 1
+                # record the all the keys
+                keyList = []
 
-                    for tmp in dictStrList:
+                for tmp in dictStrList:
 
-                        if type(tmp) == str:
-                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
-                                # if this tmp is not a dict element
-                                # tmp might be like 1 or {1,2,3}
-                                tmp = self.processString(tmp)
-                                tempDict[index] = tmp
-                                keyList.append(index)
-                                index += 1
-                        else:
-                            key = self.__parseKey(tmp[0])
-                            value = self.__parseValue(tmp[1])
+                    if type(tmp) == str:
+                        if len(tmp) != 0 and tmp.strip().lower() != 'nil':
+                            # if this tmp is not a dict element
+                            # tmp might be like 1 or {1,2,3}
+                            tmp = self.processString(tmp)
+                            tempDict[index] = tmp
+                            keyList.append(index)
+                            index += 1
+                    else:
+                        key = self.__parseKey(tmp[0])
+                        value = self.__parseValue(tmp[1])
 
-                            if value != None and (key not in keyList):
-                                # make sure the key is not used
-                                # in case the key is used, discard this pair
-                                tempDict[key] = value
-                        '''
-                        if symbolPos == -1:
-                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
-                                # if this tmp is not a dict element
-                                # tmp might be like 1 or {1,2,3}
-                                tmp = self.processString(tmp)
-                                tempDict[index] = tmp
-                                keyList.append(index)
-                                index += 1
-                        else:
-                            # tmp is a dict element
-                            key, value = self.processDictStr(tmp, symbolPos)
-                            if value != None and (key not in keyList):
-                                # make sure the key is not used
-                                # in case the key is used, discard this pair
-                                tempDict[key] = value
-                        '''
-                    return tempDict
-
-                else:
-                    # deal with a list case, like {1, 2, 3}, return a list type data []
-                    tempList = []
-                    for s in partition:
-                        temp = self.processString(s)
-                        if temp != '' and temp != {}:
-                            tempList.append(temp)
-                    return tempList
+                        if value != None and (key not in keyList):
+                            # make sure the key is not used
+                            # in case the key is used, discard this pair
+                            tempDict[key] = value
+                    '''
+                    if symbolPos == -1:
+                        if len(tmp) != 0 and tmp.strip().lower() != 'nil':
+                            # if this tmp is not a dict element
+                            # tmp might be like 1 or {1,2,3}
+                            tmp = self.processString(tmp)
+                            tempDict[index] = tmp
+                            keyList.append(index)
+                            index += 1
+                    else:
+                        # tmp is a dict element
+                        key, value = self.processDictStr(tmp, symbolPos)
+                        if value != None and (key not in keyList):
+                            # make sure the key is not used
+                            # in case the key is used, discard this pair
+                            tempDict[key] = value
+                    '''
+                return tempDict
 
             else:
-                # deal with the string like a{1,2,3}, return a dict data
-                return self.rtnCorrectType(myStr)
+                # deal with a list case, like {1, 2, 3}, return a list type data []
+                tempList = []
+                for s in partition:
+                    temp = self.processString(s)
+                    if temp != '' and temp != {}:
+                        tempList.append(temp)
+                return tempList
+
         else:
             # deal with single value data, like '1' or 'abc'
             return self.rtnCorrectType(myStr)
@@ -290,8 +290,8 @@ class PyLuaTblParser:
             lList = self.rtnCharLoc(myStr, '{')
             rList = self.rtnCharLoc(myStr, '}')
 
-            # if len(lList) != len(rList):
-            #    raise Exception('Incorrect input Lua Table')
+            if len(lList) != len(rList):
+                raise InvalidLuaTableError('Incorrect input Lua Table')
 
             # we use a stack to find corresponding bracket
             stack = []
@@ -445,7 +445,15 @@ class PyLuaTblParser:
                 endPos = self.__locateMultiLineComment(myStr, commentStart)
             else:
                 # 否则用 \n 标识注释的结束位置
+                # 跳过字符中的 \\n
+
+                jumpPos = myStr.find('\\n', commentStart + 1)
                 endPos = myStr.find('\n', commentStart + 1)
+
+                while endPos == jumpPos + 1:
+                    jumpPos = myStr.find('\\n', jumpPos + 1)
+                    endPos = myStr.find('\n', endPos + 1)
+
 
             myStr = myStr[0:commentStart] + myStr[endPos + 1:]
             myStr = self.__removeComment(myStr)
@@ -508,6 +516,11 @@ class PyLuaTblParser:
 
             return newStr
 
+    def __isAStrWithBracket(self, myStr):
+        myStr = myStr.strip()
+        return (myStr.find('{') == 0 and myStr.rfind('}') == len(myStr) - 1)
+
+
     def parseDictStr(self, inputStr='*Sdsa={13}2easd={231rfs3=P{}}'):
         '''
         test if a given string represents a dict data
@@ -528,7 +541,7 @@ class PyLuaTblParser:
 
         stripedStr = inputStr.strip()
 
-        if self.__isAStrWithQuote(stripedStr) or len(stripedStr) == 0:
+        if self.__isAStrWithQuote(stripedStr) or self.__isAStrWithBracket(stripedStr) or len(stripedStr) == 0 :
             # 如果输入代表一个字符串， 例如"xyz=123"，则一定不是dict型数据
             return inputStr
 
@@ -547,19 +560,43 @@ class PyLuaTblParser:
                 if leftQuote != -1:
                     if self.__isBlankInTwoIndex(inputStr, leftBracket, leftQuote):
                         # ["abc"] = 1 case
-                        rightQuote = inputStr.find('"', leftQuote+1)
+                        # " ] = 组合 确定了一个字典的划分
+
+                        rightQuote = inputStr.find('"', leftQuote + 1)
                         rightBracket = inputStr.find(']', rightQuote + 1)
-                        while self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == False and rightQuote != -1 and rightBracket != -1:
+                        equalPos = inputStr.find('=',rightBracket + 1)
+
+                        while (rightQuote < rightBracket < equalPos and self.__isBlankInTwoIndex(inputStr,rightQuote,rightBracket) and self.__isBlankInTwoIndex(inputStr,rightBracket,equalPos)) == False:
                             rightQuote = inputStr.find('"', rightQuote + 1)
                             rightBracket = inputStr.find(']', rightQuote + 1)
-                        if self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == False:
+                            equalPos = inputStr.find('=', rightBracket + 1)
+
+                            if rightQuote == -1 or rightBracket == -1 or equalPos == -1:
+                                raise InvalidLuaTableError('invalide lua table express, [ "abx" d] or [" ads case: non-closed bracket for a key string')
+
+                        '''
+                        rightQuote = inputStr.find('"', leftQuote+1)
+                        rightBracket = inputStr.find(']', rightQuote + 1)
+                        # 找到最后一个 "]
+                        lastRightQuote = rightQuote
+                        lastRightBracket = rightBracket
+                        while self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == True:
+                            lastRightQuote = rightQuote
+                            lastRightBracket = rightBracket
+                            if rightQuote != -1 and rightBracket != -1:
+                                rightQuote = inputStr.find('"', rightQuote + 1)
+                                rightBracket = inputStr.find(']', rightQuote + 1)
+                        if self.__isBlankInTwoIndex(inputStr, lastRightQuote, lastRightBracket) == False:
+                            # 处理 [ "abx" d] 异常 或者找不到 "] 的异常
                             print inputStr
-                            raise InvalidLuaTableError('invalide lua table express, [ "abx" d] case: non-closed bracket for string key ')
+                            raise InvalidLuaTableError('invalide lua table express, [ "abx" d] or [" ads case: non-closed bracket for a key string')
+                        '''
                     else:
                         #[1] = "x" case
                         rightBracket = inputStr.find(']', leftBracket)
                         tmp = inputStr[leftBracket+1: rightBracket].strip()
                         if self.__isNumber(tmp) == False:
+                            # 处理 不带引号的key 不为数字的异常
                             print inputStr
                             raise InvalidLuaTableError('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
                 else:
@@ -572,6 +609,12 @@ class PyLuaTblParser:
 
                 pos = inputStr.find('=', rightBracket)
 
+                if self.__isBlankInTwoIndex(inputStr, rightBracket, pos) == False:
+                    # 处理 ["x"] abc = 1 的异常
+                    raise InvalidLuaTableError(
+                        'invalide lua table express, [x] abc = 1 case: extra string between ] and = ')
+
+
             else:
                 # 如果 myStr不以[开头，则第一个=号，应该就是划分的位置
                 pos = inputStr.find('=')
@@ -580,13 +623,16 @@ class PyLuaTblParser:
                 key = inputStr[:pos].strip()
 
                 if key.find(' ') != -1:
+                    print inputStr, key
                     raise InvalidLuaTableError('found blank inside of a key string')
 
                 if key[0].isdigit():
+                    print inputStr, key
                     raise InvalidLuaTableError('found digit at the beginning of a key string')
 
                 for s in self.otherCharacterSet:
                     if key.find(s) != -1:
+                        print inputStr, key
                         raise InvalidLuaTableError('found other character in a key string')
 
             # 测试字符串的有效性：不存在多个等号

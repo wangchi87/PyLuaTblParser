@@ -94,16 +94,17 @@ root = {
     test_str = [test_str1, test_str2, test_str3, test_str4, test_str5, test_str6,test_str0, ]
 
 
-    test_str10 = '{    n$ame     = 1}'
+    test_str10 = '{["\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"] = 1}'
 
     test_str = [test_str10]
 
-    lua_table_str = '{["]\\"="] = 1}'
+    lua_table_str = '{ [97] = {{},3} }'
 
     lua_table_parser = PyLuaTblParser()
-    lua_table_parser.load(lua_table_str)
+    #lua_table_parser.load(lua_table_str)
 
-    #dumped_dict = lua_table_parser.dumpDict()
+    lua_table_parser.loadLuaTable('lua2.lua')
+    print lua_table_parser.dumpDict()
 
 
     l = []

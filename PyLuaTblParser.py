@@ -19,8 +19,7 @@ class PyLuaTblParser:
     def load(self, myStr):
         if len(myStr) == 0:
             raise Exception('Empty input Lua Table string')
-        self.luaString = self.removeComment(myStr)
-        self.removeEscapeStr()
+        self.luaString = self.__removeComment(myStr)
         self.checkLuaTbl()
 
     def dump(self):
@@ -33,8 +32,7 @@ class PyLuaTblParser:
             print 'file reading error:', e.strerror, e.errno
             raise Exception('file reading error')
         fileStr = luaFile.read()
-        self.luaString = self.removeComment(fileStr)
-        self.removeEscapeStr()
+        self.luaString = self.__removeComment(fileStr)
         self.checkLuaTbl()
 
     def checkLuaTbl(self):
@@ -49,13 +47,6 @@ class PyLuaTblParser:
         if len(lList) != len(rList):
             raise InvalidLuaTableError('Incorrect input Lua Table: bracket number does not match')
 
-    def removeEscapeStr(self):
-        pass
-        # this is left to be extended if needed
-        #escapeStrings = ['\n', '\t', '\r', '\v', '\f', '\'', '\a', '\b']
-        # delete all the possible escape strings
-        #for escStr in escapeStrings:
-            #self.luaString = self.luaString.replace(escStr, '')
 
     # load an external dict, and store in class
     def loadDict(self, dict):
@@ -168,6 +159,8 @@ class PyLuaTblParser:
     # add a lable of the string here!!!
     def processString(self, myStr):
 
+        myStr = myStr.strip()
+
         hasBracket = (myStr.find('{') != -1)
 
         if hasBracket:
@@ -178,6 +171,16 @@ class PyLuaTblParser:
 
                 pairsTuple = self.bracketDict(newStr)
                 partition = self.strPartition(newStr, pairsTuple)
+
+                dictStrList = []
+
+                for s in partition:
+                    dictStrList.append(self.isDictStr(s))
+
+                if len(dictStrList) == 0:
+                    pass
+                else:
+                    pass
 
                 if newStr.find('=') != -1:
                     # deal with the string like {1,{1,2,3},a=1}
@@ -317,10 +320,12 @@ class PyLuaTblParser:
         if self.isFloat(myStr.strip()):
             return float(myStr.strip())
 
-        value = myStr
+        value = myStr.strip()
+
+        if self.__isAStr(value):
+            value = value[1:len(value)-1]
 
         # process escape string
-        value = value.replace('abc', 'cba')
 
         value = value.replace('\\"', '\"')
         value = value.replace("\\'", '\'')
@@ -336,7 +341,7 @@ class PyLuaTblParser:
         value = value.replace('\\/', '/')
         value = value.replace('\\v', '\v')
 
-        return value.strip().strip('"')
+        return value
 
     # split given string with comma at top level
     # e.g. input : {'1','2','{3,4}'}
@@ -386,42 +391,42 @@ class PyLuaTblParser:
         '''
         pass
 
-        myStr = self.removeComment(myStr)
+        myStr = self.__removeComment(myStr)
         myStr = self.removeExtraEscapeString(myStr)
 
 
 
         return myStr
 
-    def removeComment(self, myStr):
+    def __removeComment(self, myStr):
 
         # 删除单行注释
         commentStart = myStr.find('--')
 
         # comment processing
         if commentStart != -1:
-            if self.isMultiLineComment(myStr, commentStart):
-                endPos = self.locateMultiLineComment(myStr, commentStart)
+            if self.__isMultiLineComment(myStr, commentStart):
+                endPos = self.__locateMultiLineComment(myStr, commentStart)
             else:
                 # 否则用 \n 标识注释的结束位置
                 endPos = myStr.find('\n', commentStart + 1)
 
             myStr = myStr[0:commentStart] + myStr[endPos + 1:]
-            myStr = self.removeComment(myStr)
+            myStr = self.__removeComment(myStr)
         return myStr
 
-    def isMultiLineComment(self,myStr, commentStart):
-
+    def __isMultiLineComment(self,myStr, commentStart):
+        ''' 是否有多行注释'''
         newStr = myStr[commentStart+2:].strip()
 
         if newStr.find('[[') == 0:
             return True
         return False
 
+    def __locateMultiLineComment(self,myStr, commentStart):
+        ''' 定位多行注释的结束位置'''
 
-    def locateMultiLineComment(self,myStr, commentStart):
         # myStr might be '--   [[ dsa221rfcsdsadd[[]]   -- ]]abcd'
-        # 删除 '--'
 
         if myStr.find('[[') != -1:
             end = myStr.find(']]')
@@ -471,7 +476,36 @@ class PyLuaTblParser:
 
     def isDictStr(self, myStr='*Sdsa={13}2easd={231rfs3=P{}}'):
         '''
-        test if the given str represents a dict data
+        test if a given string represents a dict data
+        correct lua dict form:
+        ["x"] = 1, [1] = "x" , x = 1, x = {...}
+        incorrect form:
+        [ x ] = 1, [1] = x, "xyz" = 1
+
+        ( 'x' is not valid here, because we are already inside of a string)
+
+        如果遇到[],则[]内的字符串可以出现任意字符，包括 =，
+        如果左侧字符不存在[],则第一个=就是划分的位置， 但是在=右侧出现"" 或者 {} 之前，再次出现=
+        那么此字符串为invalid expression， 比如 xyz=x=1
+
+        返回值，如果不是dict，返回False
+        否则，返回 = 的 index
         '''
 
+        if self.__isAStr(myStr):
+            # 如果输入代表一个字符串， 例如"xyz=123"，则一定不是dict型数据
+            return False
+
+        if myStr.find('=') == -1:
+            return False
+        else:
+            # might be a dict expression
+            pass
         pass
+
+    def __isAStr(self,myStr):
+        # 判断输入字符串是否被" " 包围，如果是，则认为myStr代表一个字符串
+        if len(myStr) > 1 and myStr[0] == '"' and myStr[len(myStr) - 1] == '"':
+            return True
+        else:
+            return False

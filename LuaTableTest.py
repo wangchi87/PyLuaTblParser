@@ -1,9 +1,13 @@
 # -*- coding:utf-8 -*-
 
+import unittest
+
 from PyLuaTblParser import *
 
 
 if __name__ == '__main__':
+
+    ut = unittest.TestCase
     path = r'LuaTable1.txt'
     test_str0 = '{1,4,dsa,abc=1,false,true}'
     test_str1 = '{array = {65;23,5,a={1,3;4,b=23}};bb = {65,23,5,}}'
@@ -85,11 +89,25 @@ root = {
 
 }}
 '''
-    test_str9 = '{80, 90;    100}'
+    test_str9 = '{ [  \t"\\ abc"  ] = 123,[123]=2,[abcd]="abcd", xx =1}'
 
     test_str = [test_str0, test_str1, test_str2, test_str3, test_str4, test_str5, test_str6]
 
-    test_str = [test_str9]
+
+    test_str10 = '{["\\""] = 1}'
+
+    test_str = [test_str10]
+
+    lua_table_str = '{["]\\"="] = 1}'
+
+    lua_table_parser = PyLuaTblParser()
+    lua_table_parser.load(lua_table_str)
+
+    dumped_dict = lua_table_parser.dumpDict()
+    print dumped_dict
+
+    print dumped_dict[']\"='] == 1
+
 
 
 
@@ -102,8 +120,11 @@ root = {
         a1.load(s)
 
         d1 = a1.dumpDict()
-
-
+        print d1
+        print d1['\"']
+        #print d1['xx']
+        #print d1['abcd']
+        #print d1['\\ abc']
         print 'Lua Table:\t', s
         print 'a1 dict:  \t', a1.dumpDict()
 

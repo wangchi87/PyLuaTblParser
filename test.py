@@ -172,6 +172,7 @@ class TestPyLuaTblParser(unittest.TestCase):
         lua_table_parser.load(lua_table_str)
 
         dumped_dict = lua_table_parser.dumpDict()
+
         self.assertEqual(dumped_dict['\"'], 1)
 
     def test_parse_str_key_with_special_str2(self):
@@ -383,6 +384,7 @@ class TestPyLuaTblParser(unittest.TestCase):
         self.assertEqual(dumped_dict[9], 86.55)
         self.assertEqual(dumped_dict[10], None)
         self.assertEqual(dumped_dict[11], "error")
+        print type(dumped_dict[12])
         self.assertTrue(type(dumped_dict[12]) == list)  # {} to []?
         self.assertTrue(len(dumped_dict[12]) == 0)
 

@@ -155,6 +155,18 @@ class PyLuaTblParser:
         value = self.processString(rightPartStr)
         return (key, value)
 
+    def __parseKey(self, keyStr):
+        keyStr = keyStr.strip()
+        keyStr = keyStr.strip('[')
+        keyStr = keyStr.strip(']')
+        key = self.rtnCorrectType(keyStr)
+        return key
+
+    def __parseValue(self, valueStr):
+        valueStr = valueStr.strip()
+        value = self.processString(valueStr)
+        return value
+
     # core function of lua table string parser
     # add a lable of the string here!!!
     def processString(self, myStr):
@@ -172,17 +184,16 @@ class PyLuaTblParser:
                 pairsTuple = self.bracketDict(newStr)
                 partition = self.strPartition(newStr, pairsTuple)
 
+
                 dictStrList = []
-
+                hasDictInTable = False
                 for s in partition:
-                    dictStrList.append(self.isDictStr(s))
+                    dictStr = self.parseDictStr(s)
+                    dictStrList.append(dictStr)
+                    if type(dictStr) != str:
+                        hasDictInTable = True
 
-                if len(dictStrList) == 0:
-                    pass
-                else:
-                    pass
-
-                if newStr.find('=') != -1:
+                if hasDictInTable:
                     # deal with the string like {1,{1,2,3},a=1}
                     # return a dict type
                     tempDict = {}
@@ -191,9 +202,26 @@ class PyLuaTblParser:
                     index = 1
                     # record the all the keys
                     keyList = []
-                    for tmp in partition:
-                        symbolPos = tmp.find('=')
 
+                    for tmp in dictStrList:
+
+                        if type(tmp) == str:
+                            if len(tmp) != 0 and tmp.strip().lower() != 'nil':
+                                # if this tmp is not a dict element
+                                # tmp might be like 1 or {1,2,3}
+                                tmp = self.processString(tmp)
+                                tempDict[index] = tmp
+                                keyList.append(index)
+                                index += 1
+                        else:
+                            key = self.__parseKey(tmp[0])
+                            value = self.__parseValue(tmp[1])
+
+                            if value != None and (key not in keyList):
+                                # make sure the key is not used
+                                # in case the key is used, discard this pair
+                                tempDict[key] = value
+                        '''
                         if symbolPos == -1:
                             if len(tmp) != 0 and tmp.strip().lower() != 'nil':
                                 # if this tmp is not a dict element
@@ -209,6 +237,7 @@ class PyLuaTblParser:
                                 # make sure the key is not used
                                 # in case the key is used, discard this pair
                                 tempDict[key] = value
+                        '''
                     return tempDict
 
                 else:
@@ -289,7 +318,10 @@ class PyLuaTblParser:
                 return True
         return False
 
-    def isFloat(self, myStr):
+    def __isNumber(self, myStr):
+        return self.__isFloat(myStr.strip()) or myStr.strip().isdigit()
+
+    def __isFloat(self, myStr):
         ''' test if a string represent a float number '''
         try:
             float(myStr)
@@ -317,7 +349,7 @@ class PyLuaTblParser:
         # is a int number ?
         if myStr.strip().isdigit():
             return int(myStr.strip())
-        if self.isFloat(myStr.strip()):
+        if self.__isFloat(myStr.strip()):
             return float(myStr.strip())
 
         value = myStr.strip()
@@ -456,7 +488,6 @@ class PyLuaTblParser:
             end = ignore
             ignore = myStr.find('\"', ignore + 1)
 
-
         end = myStr.find('"', end+1)
 
         if start == -1 and end == -1:
@@ -469,12 +500,11 @@ class PyLuaTblParser:
                     newStr = newStr + myStr[s]
                 else:
                     if myStr[s] not in escapeStrings:
-                        # " " 外的非转义字符怎么办？
                         newStr = newStr + myStr[s]
 
             return newStr
 
-    def isDictStr(self, myStr='*Sdsa={13}2easd={231rfs3=P{}}'):
+    def parseDictStr(self, inputStr='*Sdsa={13}2easd={231rfs3=P{}}'):
         '''
         test if a given string represents a dict data
         correct lua dict form:
@@ -488,24 +518,87 @@ class PyLuaTblParser:
         如果左侧字符不存在[],则第一个=就是划分的位置， 但是在=右侧出现"" 或者 {} 之前，再次出现=
         那么此字符串为invalid expression， 比如 xyz=x=1
 
-        返回值，如果不是dict，返回False
-        否则，返回 = 的 index
+        返回值，如果不是dict，返回 inputStr
+        否则，返回 [key,value]，其中 key value 为一个字典的划分
         '''
 
-        if self.__isAStr(myStr):
-            # 如果输入代表一个字符串， 例如"xyz=123"，则一定不是dict型数据
-            return False
+        stripedStr = inputStr.strip()
 
-        if myStr.find('=') == -1:
-            return False
+        if self.__isAStr(stripedStr) or len(stripedStr) == 0:
+            # 如果输入代表一个字符串， 例如"xyz=123"，则一定不是dict型数据
+            return inputStr
+
+        if stripedStr.find('=') == -1:
+            return inputStr
         else:
             # might be a dict expression
-            pass
-        pass
+
+            if stripedStr[0] == '[':
+                # 如果字符串存在[]
+                # 找到对应 ] 的位置, 其后的第一个 = 为划分位置
+                leftBracket = inputStr.find('[')
+                # 从左侧找到[ 之后的第一个"
+                leftQuote = inputStr.find('"', leftBracket)
+
+                if leftQuote != -1:
+                    if self.__isBlankInTwoIndex(inputStr, leftBracket, leftQuote):
+                        # ["abc"] = 1 case
+                        rightQuote = inputStr.find('"', leftQuote+1)
+                        while inputStr[rightQuote+1] == '"':
+                            rightQuote = rightQuote + 1
+                        rightBracket = inputStr.find(']', rightQuote)
+                        if self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == False:
+                            print inputStr
+                            raise Exception('invalide lua table express, [ "abx" d] case: extra d found')
+                    else:
+                        #[1] = "x" case
+                        rightBracket = inputStr.find(']', leftBracket)
+                        tmp = inputStr[leftBracket+1: rightBracket].strip()
+                        if self.__isNumber(tmp) == False:
+                            print inputStr
+                            raise Exception('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
+                else:
+                    # [1] = 2 case
+                    rightBracket = inputStr.find(']', leftBracket)
+                    tmp = inputStr[leftBracket+1: rightBracket].strip()
+                    if tmp.isdigit() == False:
+                        print inputStr
+                        raise Exception('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
+
+                pos = inputStr.find('=', rightBracket)
+
+            else:
+                # 如果 myStr不以[开头，则第一个=号，应该就是划分的位置
+                pos = inputStr.find('=')
+
+            # 测试字符串的有效性：不存在多个等号
+            # 尝试寻找第二个等号
+            pos2 = inputStr.find('=', pos + 1)
+            if pos2 != -1:
+                bracketPair = self.bracketDict(inputStr[pos:])
+                # 找到第一个等号后第一个左括弧{的位置
+                firstLeftBracket = bracketPair[0][0] + pos
+
+                if pos2 < firstLeftBracket:
+                    # 如果第二个等号的位置，在左括弧的后面，则返回第一个等号的位置
+                    # 作为划分的位置
+                    raise Exception('invalide lua table express, found two = in string')
+
+        key = inputStr[:pos]
+        value = inputStr[pos+1:]
+        return [key, value]
 
     def __isAStr(self,myStr):
         # 判断输入字符串是否被" " 包围，如果是，则认为myStr代表一个字符串
         if len(myStr) > 1 and myStr[0] == '"' and myStr[len(myStr) - 1] == '"':
+            return True
+        else:
+            return False
+
+    def __isBlankInTwoIndex(self,myStr,start,end):
+        # 测试start 和 end 之间是否只有空格
+        tmp = myStr[start+1:end].strip()
+        if tmp == '':
             return True
         else:
             return False

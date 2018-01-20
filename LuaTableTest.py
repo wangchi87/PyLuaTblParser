@@ -91,10 +91,10 @@ root = {
 '''
     test_str9 = '{ [  \t"\\ abc"  ] = 123,[123]=2,[abcd]="abcd", xx =1}'
 
-    test_str = [test_str0, test_str1, test_str2, test_str3, test_str4, test_str5, test_str6]
+    test_str = [test_str1, test_str2, test_str3, test_str4, test_str5, test_str6,test_str0, ]
 
 
-    test_str10 = '{["\\""] = 1}'
+    test_str10 = '{[1.1] = "Python", [2.2] = "C++", [99.99] = "PHP"}'
 
     test_str = [test_str10]
 
@@ -103,14 +103,14 @@ root = {
     lua_table_parser = PyLuaTblParser()
     lua_table_parser.load(lua_table_str)
 
-    dumped_dict = lua_table_parser.dumpDict()
-    print dumped_dict
-
-    print dumped_dict[']\"='] == 1
+    #dumped_dict = lua_table_parser.dumpDict()
 
 
-
-
+    l = []
+    dict_str = [ '["x \=]21"] = 1','',' [  "x"] = 1', '[1 ] = "x" ' , ' x = 1', ' x = {...}',]
+    #for s in dict_str:
+    #    l.append(lua_table_parser.parseDictStr(s))
+    #print l
 
     for s in test_str:
         a1 = PyLuaTblParser()
@@ -121,7 +121,7 @@ root = {
 
         d1 = a1.dumpDict()
         print d1
-        print d1['\"']
+        #print d1['\"']
         #print d1['xx']
         #print d1['abcd']
         #print d1['\\ abc']
@@ -131,12 +131,12 @@ root = {
         a2.loadDict(d1)
         print 'a2 dict:  \t', a2.dumpDict()
 
-        a2.dumpLuaTable('output.txt')
+        #a2.dumpLuaTable('output.txt')
 
-        a3.loadLuaTable('output.txt')
-        d3 = a3.dumpDict()
+        #a3.loadLuaTable('output.txt')
+        #d3 = a3.dumpDict()
 
-        print 'a3 dict: \t', d3
+        #print 'a3 dict: \t', d3
         print '\n'
 
 

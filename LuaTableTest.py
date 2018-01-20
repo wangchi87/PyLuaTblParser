@@ -94,7 +94,7 @@ root = {
     test_str = [test_str1, test_str2, test_str3, test_str4, test_str5, test_str6,test_str0, ]
 
 
-    test_str10 = '{[1.1] = "Python", [2.2] = "C++", [99.99] = "PHP"}'
+    test_str10 = '{    n$ame     = 1}'
 
     test_str = [test_str10]
 

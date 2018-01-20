@@ -12,6 +12,8 @@ class PyLuaTblParser:
     luaString = ''
     result = None
 
+    otherCharacterSet="~!@#$%^&*?"
+
     def __init__(self):
         self.result = None
         self.luaString = ''
@@ -21,6 +23,7 @@ class PyLuaTblParser:
             raise Exception('Empty input Lua Table string')
         self.luaString = self.__removeComment(myStr)
         self.checkLuaTbl()
+        self.result = self.processString(self.luaString)
 
     def dump(self):
         return self.luaString
@@ -34,6 +37,7 @@ class PyLuaTblParser:
         fileStr = luaFile.read()
         self.luaString = self.__removeComment(fileStr)
         self.checkLuaTbl()
+        self.result = self.processString(self.luaString)
 
     def checkLuaTbl(self):
         # make sure lua table starts and ends with { }
@@ -160,6 +164,7 @@ class PyLuaTblParser:
         keyStr = keyStr.strip('[')
         keyStr = keyStr.strip(']')
         key = self.rtnCorrectType(keyStr)
+
         return key
 
     def __parseValue(self, valueStr):
@@ -354,7 +359,8 @@ class PyLuaTblParser:
 
         value = myStr.strip()
 
-        if self.__isAStr(value):
+        # remove quote
+        if self.__isAStrWithQuote(value):
             value = value[1:len(value)-1]
 
         # process escape string
@@ -425,8 +431,6 @@ class PyLuaTblParser:
 
         myStr = self.__removeComment(myStr)
         myStr = self.removeExtraEscapeString(myStr)
-
-
 
         return myStr
 
@@ -524,7 +528,7 @@ class PyLuaTblParser:
 
         stripedStr = inputStr.strip()
 
-        if self.__isAStr(stripedStr) or len(stripedStr) == 0:
+        if self.__isAStrWithQuote(stripedStr) or len(stripedStr) == 0:
             # 如果输入代表一个字符串， 例如"xyz=123"，则一定不是dict型数据
             return inputStr
 
@@ -544,51 +548,83 @@ class PyLuaTblParser:
                     if self.__isBlankInTwoIndex(inputStr, leftBracket, leftQuote):
                         # ["abc"] = 1 case
                         rightQuote = inputStr.find('"', leftQuote+1)
-                        while inputStr[rightQuote+1] == '"':
-                            rightQuote = rightQuote + 1
-                        rightBracket = inputStr.find(']', rightQuote)
+                        rightBracket = inputStr.find(']', rightQuote + 1)
+                        while self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == False and rightQuote != -1 and rightBracket != -1:
+                            rightQuote = inputStr.find('"', rightQuote + 1)
+                            rightBracket = inputStr.find(']', rightQuote + 1)
                         if self.__isBlankInTwoIndex(inputStr, rightQuote, rightBracket) == False:
                             print inputStr
-                            raise Exception('invalide lua table express, [ "abx" d] case: extra d found')
+                            raise InvalidLuaTableError('invalide lua table express, [ "abx" d] case: non-closed bracket for string key ')
                     else:
                         #[1] = "x" case
                         rightBracket = inputStr.find(']', leftBracket)
                         tmp = inputStr[leftBracket+1: rightBracket].strip()
                         if self.__isNumber(tmp) == False:
                             print inputStr
-                            raise Exception('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
+                            raise InvalidLuaTableError('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
                 else:
                     # [1] = 2 case
                     rightBracket = inputStr.find(']', leftBracket)
                     tmp = inputStr[leftBracket+1: rightBracket].strip()
                     if tmp.isdigit() == False:
                         print inputStr
-                        raise Exception('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
+                        raise InvalidLuaTableError('invalide lua table express, [x]=1 case: unquoted string as key in bracket')
 
                 pos = inputStr.find('=', rightBracket)
 
             else:
                 # 如果 myStr不以[开头，则第一个=号，应该就是划分的位置
                 pos = inputStr.find('=')
+                # 在此种情况下，key的格式有特殊的要求：
+                # n ame = 1, 4name = 1 , nam#e = 1 均为错
+                key = inputStr[:pos].strip()
+
+                if key.find(' ') != -1:
+                    raise InvalidLuaTableError('found blank inside of a key string')
+
+                if key[0].isdigit():
+                    raise InvalidLuaTableError('found digit at the beginning of a key string')
+
+                for s in self.otherCharacterSet:
+                    if key.find(s) != -1:
+                        raise InvalidLuaTableError('found other character in a key string')
 
             # 测试字符串的有效性：不存在多个等号
             # 尝试寻找第二个等号
             pos2 = inputStr.find('=', pos + 1)
             if pos2 != -1:
-                bracketPair = self.bracketDict(inputStr[pos:])
-                # 找到第一个等号后第一个左括弧{的位置
-                firstLeftBracket = bracketPair[0][0] + pos
+                # 找到 第二个等号 后面的 第一个 " 或者 {
+                firstQuoteAfterEqual = inputStr.find('"', pos + 1)
+                firstBracketAfterEqual = inputStr.find('{', pos + 1)
 
-                if pos2 < firstLeftBracket:
+                if self.__isBlankInTwoIndex(inputStr, pos, firstQuoteAfterEqual):
+                    firstSeperator = firstQuoteAfterEqual
+
+                if self.__isBlankInTwoIndex(inputStr, pos, firstBracketAfterEqual):
+                    firstSeperator = firstBracketAfterEqual
+
+                if firstSeperator == -1:
+
+                    raise InvalidLuaTableError('invalide lua table express, x==1 case: found two = in string')
+
+                '''
+                # 若等号后面有{}
+                if inputStr.find('{',pos+1) != -1:
+                    bracketPair = self.bracketDict(inputStr[pos:])
+                    # 找到第一个等号后第一个左括弧{的位置
+                    firstLeftBracket = bracketPair[0][0] + pos
+                '''
+                # 如果等号在"或者{ 之前，则为错误的输入格式
+                if pos2 < firstSeperator:
                     # 如果第二个等号的位置，在左括弧的后面，则返回第一个等号的位置
                     # 作为划分的位置
-                    raise Exception('invalide lua table express, found two = in string')
+                    raise InvalidLuaTableError('invalide lua table express, x == "123" or x == {123} case: found two = in string')
 
         key = inputStr[:pos]
         value = inputStr[pos+1:]
         return [key, value]
 
-    def __isAStr(self,myStr):
+    def __isAStrWithQuote(self,myStr):
         # 判断输入字符串是否被" " 包围，如果是，则认为myStr代表一个字符串
         if len(myStr) > 1 and myStr[0] == '"' and myStr[len(myStr) - 1] == '"':
             return True

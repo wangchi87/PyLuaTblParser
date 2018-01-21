@@ -103,16 +103,6 @@ class TestPyLuaTblParser(unittest.TestCase):
         self.assertEqual(dumped_dict['empty'], '\"')
         self.assertEqual(dumped_dict['str'], 'a string.')
 
-    def test_parse_string_value_with_escape_character(self):
-        lua_table_str = '{empty = "]\\"=", str = "a string."}'
-
-        lua_table_parser = PyLuaTblParser()
-        lua_table_parser.load(lua_table_str)
-
-        dumped_dict = lua_table_parser.dumpDict()
-        self.assertEqual(dumped_dict['empty'], ']\"=')
-        self.assertEqual(dumped_dict['str'], 'a string.')
-
     def test_parse_string_value_with_any_character(self):
         lua_table_str = '{empty = "\\\\\\"\\b\\f\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?", str = "a string."}'
 
@@ -159,11 +149,6 @@ class TestPyLuaTblParser(unittest.TestCase):
         lua_table_parser = PyLuaTblParser()
         self.assertRaises(InvalidLuaTableError, lua_table_parser.load, lua_table_str)
 
-    def test_parse_str_key_with_other_str_after_the_key1(self):
-        lua_table_str = '{["key"] xxx = 1}'
-
-        lua_table_parser = PyLuaTblParser()
-        self.assertRaises(InvalidLuaTableError, lua_table_parser.load, lua_table_str)
 
     def test_parse_str_key_with_special_str1(self):
         lua_table_str = '{["\\""] = 1}'
@@ -384,7 +369,6 @@ class TestPyLuaTblParser(unittest.TestCase):
         self.assertEqual(dumped_dict[9], 86.55)
         self.assertEqual(dumped_dict[10], None)
         self.assertEqual(dumped_dict[11], "error")
-        print type(dumped_dict[12])
         self.assertTrue(type(dumped_dict[12]) == list)  # {} to []?
         self.assertTrue(len(dumped_dict[12]) == 0)
 
@@ -428,8 +412,7 @@ class TestPyLuaTblParser(unittest.TestCase):
         self.assertEqual(scores['Math'], 89.5)
         self.assertEqual(scores[2], 72.5)
         self.assertEqual(scores['English'], 99)
-        # !!!!!! score[3] = 86.55????
-        #self.assertEqual(scores[4], 86.55)
+        self.assertEqual(scores[3], 86.55)
         self.assertFalse('computer' in scores.keys())
 
     def test_parse_nested_lua_table(self):
@@ -468,5 +451,5 @@ class TestPyLuaTblParser(unittest.TestCase):
 
         self.assertEqual(dict1['string'], 'value')
 
-
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()

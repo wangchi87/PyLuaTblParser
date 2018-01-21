@@ -175,7 +175,8 @@ class PyLuaTblParser:
     # core function of lua table string parser
     # add a lable of the string here!!!
     def processString(self, myStr):
-        # {},{},{}
+        # {},{},{}??
+
         myStr = myStr.strip()
 
         hasBracket = (myStr.find('{') == 0 and myStr.rfind('}') == len(myStr) - 1)
@@ -184,6 +185,19 @@ class PyLuaTblParser:
 
             # if string starts with '{' and ends with '}'
             newStr = myStr[1:len(myStr) - 1].strip()
+
+            # fix {}, {}, {} bugs
+            allBracket = newStr.split(',')
+            areAllBracket = True
+            bracketList = []
+            for s in allBracket:
+                if s.strip() == '{}':
+                    bracketList.append([])
+                else:
+                    areAllBracket = False
+                    break
+            if areAllBracket:
+                return bracketList
 
             if (newStr.find('{') == 0 and newStr.rfind('}') == len(newStr) - 1):
                 tmp = []
@@ -434,13 +448,53 @@ class PyLuaTblParser:
 
         return myStr
 
+    def __skipComment(self,myStr):
+        self.__removeComment(myStr)
+
     def __removeComment(self, myStr):
 
+        uncommentedStr = myStr
+        inQuote = False
+
+        index = 0
+        length = len(myStr)
+
+        while index < length:
+            if myStr[index] == '"' and inQuote == False:
+                inQuote = True
+                index += 1
+                continue
+            if myStr[index] == '"' and inQuote == True:
+                inQuote = False
+                index += 1
+                continue
+            if myStr[index] == '\\' and myStr[index+1] == '"'and inQuote == True:
+                # jump over escaping quote in a rea double quote
+                index += 2
+                continue
+            if myStr[index: index + 2] == '--':
+                if inQuote == False:
+                    uncommentedStr = self.__processComment(uncommentedStr, index)
+                    break
+                else:
+                    index += 2
+                    continue
+            index += 1
+        if uncommentedStr!=myStr:
+            return self.__removeComment(uncommentedStr)
+        else:
+            return myStr
+
+
+
+
+        '''
         # 删除单行注释
         commentStart = myStr.find('--')
 
         # comment processing
         if commentStart != -1:
+
             if self.__isMultiLineComment(myStr, commentStart):
                 endPos = self.__locateMultiLineComment(myStr, commentStart)
             else:
@@ -457,6 +511,24 @@ class PyLuaTblParser:
 
             myStr = myStr[0:commentStart] + myStr[endPos + 1:]
             myStr = self.__removeComment(myStr)
+        return myStr
+        '''
+
+    def __processComment(self, myStr, commentStart):
+        if self.__isMultiLineComment(myStr, commentStart):
+            endPos = self.__locateMultiLineComment(myStr, commentStart)
+        else:
+            # 否则用 \n 标识注释的结束位置
+            # 跳过字符中的 \\n
+
+            jumpPos = myStr.find('\\n', commentStart + 1)
+            endPos = myStr.find('\n', commentStart + 1)
+
+            while endPos == jumpPos + 1:
+                jumpPos = myStr.find('\\n', jumpPos + 1)
+                endPos = myStr.find('\n', endPos + 1)
+
+        myStr = myStr[0:commentStart] + myStr[endPos + 1:]
         return myStr
 
     def __isMultiLineComment(self,myStr, commentStart):

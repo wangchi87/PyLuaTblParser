@@ -92,19 +92,22 @@ root = {
     test_str9 = '{ [  \t"\\ abc"  ] = 123,[123]=2,[abcd]="abcd", xx =1}'
 
     test_str = [test_str1, test_str2, test_str3, test_str4, test_str5, test_str6,test_str0, ]
+    s1 = "\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"
+    s2 = '\\"'
 
 
-    test_str10 = '{["\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"] = 1}'
+    test_str10 = '{["\\"--asd"] = 1 --asd\n 123}'
 
     test_str = [test_str10]
 
-    lua_table_str = '{ [97] = {{},3} }'
+    lua_table_str ='{["\s\\"--asd"] = 1 --asd\n 123}'
 
     lua_table_parser = PyLuaTblParser()
     #lua_table_parser.load(lua_table_str)
 
     lua_table_parser.loadLuaTable('lua2.lua')
     print lua_table_parser.dumpDict()
+
 
 
     l = []

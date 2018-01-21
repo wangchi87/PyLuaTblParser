@@ -100,12 +100,12 @@ root = {
 
     test_str = [test_str10]
 
-    lua_table_str ='{["\s\\"--asd"] = 1 --asd\n 123}'
+    lua_table_str ='{array = {65,23,5},}'
 
     lua_table_parser = PyLuaTblParser()
-    #lua_table_parser.load(lua_table_str)
+    lua_table_parser.load(lua_table_str)
 
-    lua_table_parser.loadLuaTable('lua2.lua')
+    #lua_table_parser.loadLuaTable('lua2.lua')
     print lua_table_parser.dumpDict()
 
 

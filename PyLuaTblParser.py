@@ -12,7 +12,7 @@ class PyLuaTblParser:
     luaString = ''
     result = None
 
-    otherCharacterSet="~!@#$%^&*()_+-={':[,]}|;.</>?"
+    otherCharacterSet="~!@#$%^&*()+-={':[,]}|;.</>?"
 
     def __init__(self):
         self.result = None
@@ -204,8 +204,9 @@ class PyLuaTblParser:
                 tmp.append(self.processString(newStr))
                 return tmp
 
-            pairsTuple = self.bracketDict(newStr)
-            partition = self.strPartition(newStr, pairsTuple)
+            #pairsTuple = self.bracketDict(newStr)
+            #partition = self.strPartition(newStr, pairsTuple)
+            partition = self.stringPartition(newStr)
 
             dictStrList = []
             hasDictInTable = False
@@ -243,23 +244,6 @@ class PyLuaTblParser:
                             # make sure the key is not used
                             # in case the key is used, discard this pair
                             tempDict[key] = value
-                    '''
-                    if symbolPos == -1:
-                        if len(tmp) != 0 and tmp.strip().lower() != 'nil':
-                            # if this tmp is not a dict element
-                            # tmp might be like 1 or {1,2,3}
-                            tmp = self.processString(tmp)
-                            tempDict[index] = tmp
-                            keyList.append(index)
-                            index += 1
-                    else:
-                        # tmp is a dict element
-                        key, value = self.processDictStr(tmp, symbolPos)
-                        if value != None and (key not in keyList):
-                            # make sure the key is not used
-                            # in case the key is used, discard this pair
-                            tempDict[key] = value
-                    '''
                 return tempDict
 
             else:
@@ -395,6 +379,59 @@ class PyLuaTblParser:
 
         return value
 
+    def stringPartition(self, myStr):
+        partition = []
+
+        seperatorList = [',', ';']
+
+        strBeginPos = 0
+        seperatorPos = 0
+
+        index = 0
+        length = len(myStr)
+
+        inQuote = False
+        bracketLayer = 0
+
+        while index < length:
+            if myStr[index] == '"' and inQuote == False:
+                inQuote = True
+                index += 1
+                continue
+            if myStr[index] == '"' and inQuote == True:
+                inQuote = False
+                index += 1
+                continue
+            if myStr[index] == '\\' and myStr[index+1] == '"'and inQuote == True:
+                # jump over escaping quote in a rea double quote
+                index += 2
+                continue
+
+            if inQuote == False and myStr[index] == '{':
+                bracketLayer += 1
+                index += 1
+                continue
+            if inQuote == False and myStr[index] == '}':
+                bracketLayer -= 1
+                index += 1
+                continue
+            if inQuote == True and (myStr[index] == '{' or myStr[index] == '}'):
+                index += 1
+                continue
+
+            if myStr[index] in seperatorList and bracketLayer == 0 and inQuote == False:
+                # find a partition
+                partition.append(myStr[strBeginPos: index])
+                index += 1
+                strBeginPos = index
+                continue
+            index = index + 1
+
+        if strBeginPos!= length :
+            partition.append(myStr[strBeginPos:])
+
+        return partition
+
     # split given string with comma at top level
     # e.g. input : {'1','2','{3,4}'}
     #      output: '1,2,{3,4}'R
@@ -484,35 +521,6 @@ class PyLuaTblParser:
             return self.__removeComment(uncommentedStr)
         else:
             return myStr
-
-
-
-
-        '''
-        # 删除单行注释
-        commentStart = myStr.find('--')
-
-        # comment processing
-        if commentStart != -1:
-
-            if self.__isMultiLineComment(myStr, commentStart):
-                endPos = self.__locateMultiLineComment(myStr, commentStart)
-            else:
-                # 否则用 \n 标识注释的结束位置
-                # 跳过字符中的 \\n
-
-                jumpPos = myStr.find('\\n', commentStart + 1)
-                endPos = myStr.find('\n', commentStart + 1)
-
-                while endPos == jumpPos + 1:
-                    jumpPos = myStr.find('\\n', jumpPos + 1)
-                    endPos = myStr.find('\n', endPos + 1)
-
-
-            myStr = myStr[0:commentStart] + myStr[endPos + 1:]
-            myStr = self.__removeComment(myStr)
-        return myStr
-        '''
 
     def __processComment(self, myStr, commentStart):
         if self.__isMultiLineComment(myStr, commentStart):

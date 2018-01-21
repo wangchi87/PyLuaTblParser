@@ -100,64 +100,16 @@ root = {
 
     test_str = [test_str10]
 
-    lua_table_str ='{array = {65,23,5},}'
+
+    #bug1= '{special = "`1~!@#$%^&*()_+-={':[,]}|;.</>?",hex = "a",}'
+
+    lua_table_str ='{backslash = "\\\\", controls = "\\b\\f\\n\\r\\t",}'
 
     lua_table_parser = PyLuaTblParser()
-    lua_table_parser.load(lua_table_str)
+    #lua_table_parser.load(lua_table_str)
 
-    #lua_table_parser.loadLuaTable('lua2.lua')
+    lua_table_parser.loadLuaTable('lua2.lua')
+    #lua_table_parser.loadLuaTable('rawluatable.lua')
     print lua_table_parser.dumpDict()
 
 
-
-    l = []
-    dict_str = [ '["x \=]21"] = 1','',' [  "x"] = 1', '[1 ] = "x" ' , ' x = 1', ' x = {...}',]
-    #for s in dict_str:
-    #    l.append(lua_table_parser.parseDictStr(s))
-    #print l
-
-    for s in test_str:
-        a1 = PyLuaTblParser()
-        a2 = PyLuaTblParser()
-        a3 = PyLuaTblParser()
-
-        a1.load(s)
-
-        d1 = a1.dumpDict()
-        print d1
-        #print d1['\"']
-        #print d1['xx']
-        #print d1['abcd']
-        #print d1['\\ abc']
-        print 'Lua Table:\t', s
-        print 'a1 dict:  \t', a1.dumpDict()
-
-        a2.loadDict(d1)
-        print 'a2 dict:  \t', a2.dumpDict()
-
-        #a2.dumpLuaTable('output.txt')
-
-        #a3.loadLuaTable('output.txt')
-        #d3 = a3.dumpDict()
-
-        #print 'a3 dict: \t', d3
-        print '\n'
-
-
-test = 'sad--[luatext = "{\"object with 1 {{{&&%^%%%@%%@#}}member\" = {\"array with 1 element\"}}1234--sda\nxyz'
-b = PyLuaTblParser()
-#print b.removeComment(test)
-
-
-commentTest = '''abc--[[[][][]  Test multi-line comments
-			compact = {1,2,3,4,5,6,7},
-	- -[luatext = "{\"object with 1 member\" = {\"array with 1 element\"}}",
-		quotes = "&#34; (0x0022) %22 0x22 034 &#x22;",
-		["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"]
-		= "A key can be any string"]]
-	--         ]]def'''
-
-
-#print b.removeExtraEscapeString(''' \n\t["\\\"\b\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"] ''')
-
-#print b.removeExtraEscapeString(' \n\t243rfdsf   ')

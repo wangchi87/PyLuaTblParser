@@ -402,11 +402,10 @@ class PyLuaTblParser:
                 inQuote = False
                 index += 1
                 continue
-            if myStr[index] == '\\' and myStr[index+1] == '"'and inQuote == True:
-                # jump over escaping quote in a rea double quote
+            if myStr[index] == '\\':
+                # 进入转义字符状态
                 index += 2
                 continue
-
             if inQuote == False and myStr[index] == '{':
                 bracketLayer += 1
                 index += 1
@@ -505,8 +504,8 @@ class PyLuaTblParser:
                 inQuote = False
                 index += 1
                 continue
-            if myStr[index] == '\\' and myStr[index+1] == '"'and inQuote == True:
-                # jump over escaping quote in a rea double quote
+            if myStr[index] == '\\':
+                # 转义字符，直接忽略其后面一个字符
                 index += 2
                 continue
             if myStr[index: index + 2] == '--':
